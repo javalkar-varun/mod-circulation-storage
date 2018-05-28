@@ -235,6 +235,48 @@ public class LoansApiTest extends ApiTests {
   }
 
   @Test
+  public void canCreateALoanWithDateOnlyDueDate()
+    throws InterruptedException,
+    ExecutionException,
+    TimeoutException,
+    MalformedURLException {
+
+    UUID id = UUID.randomUUID();
+    UUID itemId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID proxyUserId = UUID.randomUUID();
+
+    DateTime loanDate = new DateTime(2017, 2, 27, 10, 23, 43, DateTimeZone.UTC);
+
+    CompletableFuture<JsonResponse> createCompleted = new CompletableFuture<>();
+
+    JsonObject loanRequest = new LoanRequestBuilder()
+      .withId(id)
+      .withUserId(userId)
+      .withProxyUserId(proxyUserId)
+      .withItemId(itemId)
+      .withLoanDate(loanDate)
+      .withStatus("Open")
+      .create()
+      .put("dueDate", "2017-03-29");
+
+    client.post(loanStorageUrl(), loanRequest, StorageTestSuite.TENANT_ID,
+      ResponseHandler.json(createCompleted));
+
+    JsonResponse response = createCompleted.get(5, TimeUnit.SECONDS);
+
+    assertThat(String.format("Failed to create loan: %s", response.getBody()),
+      response.getStatusCode(), is(HttpURLConnection.HTTP_CREATED));
+
+    JsonObject loan = response.getJson();
+
+    //The RAML-Module-Builder converts all date-time formatted strings to UTC
+    //and presents the offset as +0000 (which is ISO8601 compatible, but not RFC3339)
+    assertThat("system return date does not match",
+      loan.getString("dueDate"), is("2017-03-29T00:00:00.000+0000"));
+  }
+
+  @Test
   public void canCreateALoanAtASpecificLocation()
     throws MalformedURLException,
     InterruptedException,
